@@ -1,0 +1,13 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install btop
+brew install neovim
+brew install starship
+brew install --cask iterm2
+brew tap homebrew/cask-fonts
+brew install --cask font-hack-nerd-font
+brew install --cask rectangle
+brew install --cask alt-tab
+brew install go-task
+{{ end -}}
