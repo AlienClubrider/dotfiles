@@ -72,6 +72,8 @@
     wezterm
     neovim
     nerd-fonts.hack
+    herdr
+    claude-code
   ];
   fonts.fontconfig.enable = true;
 
@@ -80,6 +82,9 @@
 
   home.file.".config/nvim".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/nvim";
+
+  home.file.".config/herdr".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/herdr";
 
   home.sessionVariables = {
     EDITOR = "nvim";
