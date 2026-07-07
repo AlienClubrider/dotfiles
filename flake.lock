@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "herdr": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1783377126,
-        "narHash": "sha256-MG7mJRs6pFfeN9YkaSuLSMGCUvDHAyGgAvTLhDGAt4o=",
-        "owner": "ogulcancelik",
-        "repo": "herdr",
-        "rev": "5b4450c969a4118298dbe8cf495391eb1e8d47db",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ogulcancelik",
-        "repo": "herdr",
-        "type": "github"
-      }
-    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -58,7 +38,6 @@
     },
     "root": {
       "inputs": {
-        "herdr": "herdr",
         "home-manager": "home-manager",
         "nixpkgs": "nixpkgs"
       }
