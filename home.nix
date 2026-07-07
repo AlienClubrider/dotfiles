@@ -33,6 +33,11 @@
       gl = "git log --oneline --graph --decorate";
       vim = "nvim";
       vi = "nvim";
+      t = "tmux";
+      ta = "tmux attach";
+      tn = "tmux new -s";
+      tl = "tmux ls";
+      tk = "tmux kill-session -t";
     };
 
     initContent = ''
