@@ -23,18 +23,10 @@ or Linux machine.
 
 ## Using this on a brand new machine
 
-Works on both macOS and Linux, with two lines in the repo you edit first
-depending on which:
-
-1. In `flake.nix`, set `system` to match your machine:
-   - Linux: `x86_64-linux`
-   - Mac (Apple Silicon): `aarch64-darwin`
-   - Mac (Intel): `x86_64-darwin`
-2. In `home.nix`, set `home.username` and `home.homeDirectory`:
-   - Linux: `/home/<username>`
-   - Mac: `/Users/<username>`
-
-Then clone the repo anywhere you like and run the bootstrap script:
+Works unmodified on both macOS (Apple Silicon or Intel) and Linux — the
+flake detects the current system and username at switch time (via
+`--impure`, see below), so there's nothing to edit first. Clone the repo
+anywhere you like and run the bootstrap script:
 
 ```sh
 git clone git@github.com:AlienClubrider/dotfiles.git
@@ -59,6 +51,37 @@ effect.
 If you already have a `~/.zshrc` (or other files home-manager wants to
 manage), move it aside first — e.g. `mv ~/.zshrc ~/.zshrc.bak` — since
 home-manager refuses to overwrite files it doesn't already own.
+
+### Why `--impure`
+
+`flake.nix` reads the current system (`builtins.currentSystem`) and user
+(`$USER`) at evaluation time instead of hardcoding them, which is what
+lets the same flake work on any machine unedited. Both are impure by Nix's
+definition (their value depends on where you run it), so `bootstrap.sh`
+and `rebuild.sh` both pass `--impure`. Everything else about the config is
+still fully pinned by `flake.lock`.
+
+### macOS notes
+
+- `wezterm` runs straight from nixpkgs — no wrapper needed, since it talks
+  to Metal directly instead of needing Linux's EGL/GL stack.
+- The nerd font gets symlinked into `~/Library/Fonts` automatically on
+  activation, since macOS apps read fonts via CoreText rather than
+  fontconfig.
+
+### Linux notes
+
+- `wezterm` is wrapped with [nixGL](https://github.com/nix-community/nixGL)
+  (`nixGLDefault`, which auto-detects Nvidia vs. Mesa at switch time).
+  Nix-built GUI apps can't see a non-NixOS host's GPU drivers on their
+  own, so without this wrapper wezterm fails to open a window with an EGL
+  error.
+
+## Everyday use
+
+Run `shortcuts` any time to print the full list of shell aliases this
+config sets up (`ll`, `gs`, `ta`, etc.) — it's generated straight from
+`home.nix`, so it never drifts out of date.
 
 ## Making changes later
 

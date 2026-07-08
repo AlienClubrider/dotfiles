@@ -23,7 +23,7 @@ ln -sfn "$DIR" ~/.dotfiles
 echo "==> Step 3: first home-manager switch"
 # The home-manager command doesn't exist yet on a fresh machine, so run it
 # straight from the flake this once. After this, rebuild.sh works normally.
-nix run home-manager/master -- switch --flake ~/.dotfiles#bryson
+nix run home-manager/master -- switch --impure --flake ~/.dotfiles#bryson
 
 echo "==> Step 4: make zsh the login shell"
 # home-manager runs unprivileged and can't touch /etc/passwd or /etc/shells,

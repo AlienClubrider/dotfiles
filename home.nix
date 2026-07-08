@@ -1,8 +1,55 @@
-{ pkgs, config, ... }:
+{ pkgs, lib, config, isLinux, ... }:
 
+let
+  username = builtins.getEnv "USER";
+
+  aliases = {
+    ll = "eza -la";
+    ls = "eza";
+    cat = "bat";
+    gs = "git status";
+    ga = "git add";
+    gc = "git commit";
+    gp = "git push";
+    gl = "git log --oneline --graph --decorate";
+    vim = "nvim";
+    vi = "nvim";
+    t = "tmux";
+    ta = "tmux attach";
+    tn = "tmux new -s";
+    tl = "tmux ls";
+    tk = "tmux kill-session -t";
+  };
+
+  # Generated from `aliases` above so it can never drift out of sync with
+  # what's actually configured.
+  shortcuts = pkgs.writeShellScriptBin "shortcuts" ''
+    echo "Shell aliases:"
+    ${lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (name: value: ''printf "  %-6s %s\n" "${name}" "${value}"'') aliases
+    )}
+  '';
+
+  # wezterm needs GPU/EGL access that nix can't see on a non-NixOS Linux
+  # host, so wrap it with nixGL (auto-detects Nvidia vs. Mesa) to pick up
+  # the system's real drivers. Not needed on macOS, where wezterm talks to
+  # Metal directly.
+  weztermPackages =
+    if isLinux then
+      [
+        (pkgs.writeShellScriptBin "wezterm" ''
+          exec ${pkgs.nixgl.auto.nixGLDefault}/bin/nixGL ${pkgs.wezterm}/bin/wezterm "$@"
+        '')
+        (pkgs.writeShellScriptBin "wezterm-gui" ''
+          exec ${pkgs.nixgl.auto.nixGLDefault}/bin/nixGL ${pkgs.wezterm}/bin/wezterm-gui "$@"
+        '')
+      ]
+    else
+      [ pkgs.wezterm ];
+in
 {
-  home.username = "johanna";
-  home.homeDirectory = "/home/johanna";
+  home.username = username;
+  home.homeDirectory = if isLinux then "/home/${username}" else "/Users/${username}";
 
   # Bump when moving to a newer home-manager release; do not change on a whim.
   home.stateVersion = "24.11";
@@ -22,23 +69,7 @@
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
 
-    shellAliases = {
-      ll = "eza -la";
-      ls = "eza";
-      cat = "bat";
-      gs = "git status";
-      ga = "git add";
-      gc = "git commit";
-      gp = "git push";
-      gl = "git log --oneline --graph --decorate";
-      vim = "nvim";
-      vi = "nvim";
-      t = "tmux";
-      ta = "tmux attach";
-      tn = "tmux new -s";
-      tl = "tmux ls";
-      tk = "tmux kill-session -t";
-    };
+    shellAliases = aliases;
 
     initContent = ''
       bindkey '^f' autosuggest-accept
@@ -80,13 +111,23 @@
     fd
     bat
     eza
-    wezterm
     neovim
     nerd-fonts.hack
     claude-code
     jq
-  ];
+    shortcuts
+  ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
+
+  # home-manager's font handling is Linux-oriented (fontconfig); macOS apps
+  # read fonts straight from ~/Library/Fonts via CoreText instead, so link
+  # the nix-installed nerd font there too.
+  home.activation.installNerdFontOnDarwin = lib.mkIf (!isLinux) (
+    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      run mkdir -p "$HOME/Library/Fonts"
+      $DRY_RUN_CMD find ${pkgs.nerd-fonts.hack}/share/fonts -type f \( -name '*.ttf' -o -name '*.otf' \) -exec ${pkgs.coreutils}/bin/ln -sf {} "$HOME/Library/Fonts/" \;
+    ''
+  );
 
   home.file.".config/wezterm".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/wezterm";
