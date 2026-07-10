@@ -22,8 +22,9 @@ let
   };
 
   # Generated from `aliases` above so it can never drift out of sync with
-  # what's actually configured.
-  shortcuts = pkgs.writeShellScriptBin "shortcuts" ''
+  # what's actually configured. Named "myshortcuts" (not "shortcuts") to
+  # avoid colliding with macOS's built-in /usr/bin/shortcuts CLI.
+  myshortcuts = pkgs.writeShellScriptBin "myshortcuts" ''
     echo "Shell aliases:"
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList (name: value: ''printf "  %-6s %s\n" "${name}" "${value}"'') aliases
@@ -123,7 +124,7 @@ in
     claude-code
     jq
     mise
-    shortcuts
+    myshortcuts
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
 

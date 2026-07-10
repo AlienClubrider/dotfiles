@@ -79,7 +79,7 @@ still fully pinned by `flake.lock`.
 
 ## Everyday use
 
-Run `shortcuts` any time to print the full list of shell aliases this
+Run `myshortcuts` any time to print the full list of shell aliases this
 config sets up (`ll`, `gs`, `ta`, etc.) — it's generated straight from
 `home.nix`, so it never drifts out of date.
 
