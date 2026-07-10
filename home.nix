@@ -29,6 +29,13 @@ let
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList (name: value: ''printf "  %-6s %s\n" "${name}" "${value}"'') aliases
     )}
+    echo ""
+    echo "Tmux (prefix is Ctrl-b):"
+    printf "  %-14s %s\n" "Ctrl-b arrow" "switch pane in that direction"
+    printf "  %-14s %s\n" "Ctrl-b o" "cycle to next pane"
+    printf "  %-14s %s\n" "Ctrl-b q" "show pane numbers, then press one to jump"
+    printf "  %-14s %s\n" "Ctrl-b \\" "split pane vertically (side by side)"
+    printf "  %-14s %s\n" "Ctrl-b -" "split pane horizontally (stacked)"
   '';
 
   # wezterm needs GPU/EGL access that nix can't see on a non-NixOS Linux
