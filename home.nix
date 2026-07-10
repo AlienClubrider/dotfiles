@@ -106,11 +106,12 @@ in
     enable = true;
     keyMode = "vi";
     mouse = true;
+    prefix = "C-Space";
     extraConfig = ''
       unbind %
-      bind v split-window -h -c "#{pane_current_path}"
+      bind '\' split-window -h -c "#{pane_current_path}"
       unbind '"'
-      bind h split-window -v -c "#{pane_current_path}"
+      bind - split-window -v -c "#{pane_current_path}"
     '';
   };
 
