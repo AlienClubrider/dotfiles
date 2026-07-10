@@ -73,6 +73,7 @@ in
 
     initContent = ''
       bindkey '^f' autosuggest-accept
+      eval "$(mise activate zsh)"
     '';
   };
 
@@ -104,6 +105,12 @@ in
     enable = true;
     keyMode = "vi";
     mouse = true;
+    extraConfig = ''
+      unbind %
+      bind v split-window -h -c "#{pane_current_path}"
+      unbind '"'
+      bind h split-window -v -c "#{pane_current_path}"
+    '';
   };
 
   home.packages = with pkgs; [
@@ -115,6 +122,7 @@ in
     nerd-fonts.hack
     claude-code
     jq
+    mise
     shortcuts
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
