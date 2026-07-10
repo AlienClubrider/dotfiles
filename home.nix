@@ -106,7 +106,6 @@ in
     enable = true;
     keyMode = "vi";
     mouse = true;
-    prefix = "C-Space";
     extraConfig = ''
       unbind %
       bind '\' split-window -h -c "#{pane_current_path}"
