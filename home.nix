@@ -75,6 +75,7 @@ in
     initContent = ''
       bindkey '^f' autosuggest-accept
       eval "$(mise activate zsh)"
+      eval "$(wt config shell init zsh)"
     '';
   };
 
@@ -125,6 +126,7 @@ in
     jq
     mise
     myshortcuts
+    worktrunk
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
 
