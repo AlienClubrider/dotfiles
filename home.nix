@@ -147,6 +147,18 @@ in
     ''
   );
 
+  # macOS occasionally resets "Automatically hide and show the menu bar" on
+  # its own (known behavior after waking from sleep or changing displays).
+  # Not a nix-darwin box, so home-manager can't declare system.defaults;
+  # reapplying it as a plain `defaults write` on every switch is the
+  # equivalent self-healing fix.
+  home.activation.hideMenuBarOnDarwin = lib.mkIf (!isLinux) (
+    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      $DRY_RUN_CMD /usr/bin/defaults write NSGlobalDomain _HIHideMenuBar -bool true
+      $DRY_RUN_CMD /usr/bin/killall SystemUIServer || true
+    ''
+  );
+
   # Caps Lock -> Escape, mainly for vim. Went through the desktop's own
   # keyboard-settings gsettings key first (org.cinnamon.desktop.input-sources
   # xkb-options), but confirmed on the actual machine that Cinnamon's
