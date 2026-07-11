@@ -68,6 +68,10 @@ still fully pinned by `flake.lock`.
 - The nerd font gets symlinked into `~/Library/Fonts` automatically on
   activation, since macOS apps read fonts via CoreText rather than
   fontconfig.
+- Caps Lock -> Escape isn't scripted here (no nix-darwin means home-manager
+  can't touch system keyboard settings). Set it manually once: System
+  Settings > Keyboard > Keyboard Shortcuts > Modifier Keys > set the Caps
+  Lock key to Escape.
 
 ### Linux notes
 
@@ -76,6 +80,13 @@ still fully pinned by `flake.lock`.
   Nix-built GUI apps can't see a non-NixOS host's GPU drivers on their
   own, so without this wrapper wezterm fails to open a window with an EGL
   error.
+- Caps Lock is remapped to Escape via an XDG autostart entry that runs
+  `setxkbmap -option caps:escape` at login. Went with this over the
+  desktop's own keyboard-settings (gsettings/dconf) because Cinnamon's
+  settings daemon didn't actually apply that key to the live X session when
+  tested — `setxkbmap` in autostart works regardless of which X11 desktop
+  is running. It's additive (`-option`, not `-options`), so it layers onto
+  whatever XKB options the system already sets rather than replacing them.
 
 ## Everyday use
 

@@ -147,6 +147,26 @@ in
     ''
   );
 
+  # Caps Lock -> Escape, mainly for vim. Went through the desktop's own
+  # keyboard-settings gsettings key first (org.cinnamon.desktop.input-sources
+  # xkb-options), but confirmed on the actual machine that Cinnamon's
+  # settings daemon (csd-keyboard) never applies that key to the live X
+  # server, even right after a fresh daemon respawn with the value already
+  # set. An XDG autostart entry calling setxkbmap directly is what actually
+  # works (verified live): it's DE-agnostic (any X11 session honors XDG
+  # autostart) and additive (`-option`, not `-options`, layers onto
+  # whatever options the system already sets rather than replacing them).
+  home.file.".config/autostart/remap-capslock-escape.desktop" = lib.mkIf isLinux {
+    text = ''
+      [Desktop Entry]
+      Type=Application
+      Name=Remap Caps Lock to Escape
+      Exec=sh -c 'command -v setxkbmap >/dev/null 2>&1 && setxkbmap -option caps:escape'
+      X-GNOME-Autostart-enabled=true
+      NoDisplay=true
+    '';
+  };
+
   home.file.".config/wezterm".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/wezterm";
 
