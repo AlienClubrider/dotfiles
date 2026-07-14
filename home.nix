@@ -259,6 +259,15 @@ in
     '';
   };
 
+  # Registers herdr's Claude Code integration hook (~/.claude/hooks/herdr-agent-state.sh
+  # + the SessionStart entry in claude/settings.json) so herdr's own agent-status
+  # tracking (idle/working/blocked) works for Claude Code workers spawned by the
+  # Delegation Workflow - reapplied every switch since it's idempotent and this is
+  # how the hook script itself gets (re)written on a new machine.
+  home.activation.installHerdrClaudeIntegration = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    $DRY_RUN_CMD ${pkgs.herdr}/bin/herdr integration install claude
+  '';
+
   home.file.".config/wezterm".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/wezterm";
 
