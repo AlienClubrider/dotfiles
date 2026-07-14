@@ -220,6 +220,10 @@ in
   home.file.".config/opencode/AGENTS.md".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/AGENTS.md";
 
+  # pi has no native global-instructions mechanism today (would need a
+  # third-party memory extension with its own non-AGENTS.md storage format) -
+  # deliberately not wired here, not an oversight.
+
   home.sessionVariables = {
     EDITOR = "nvim";
   };
