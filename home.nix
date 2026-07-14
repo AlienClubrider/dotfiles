@@ -53,6 +53,62 @@ let
     printf "  %-24s %s\n" "herdr" "launch or attach to the persistent session"
     printf "  %-24s %s\n" "Ctrl-b q" "detach (session keeps running)"
     printf "  %-24s %s\n" "herdr session attach x" "reattach to named session \"x\""
+    echo ""
+    echo "agents-init (per-project AGENTS.md/CLAUDE.md wiring):"
+    printf "  %-14s %s\n" "agents-init" "create AGENTS.md + CLAUDE.md in cwd's repo, git-excluded locally"
+  '';
+
+  # Bootstraps a project's AGENTS.md/CLAUDE.md wiring without ever committing
+  # either file to the project itself - these are personal, per-project notes
+  # (not team-shared conventions), so they're kept out of the repo's own
+  # .gitignore and excluded locally via .git/info/exclude instead.
+  agentsInit = pkgs.writeShellScriptBin "agents-init" ''
+    set -euo pipefail
+
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+      echo "agents-init: not inside a git repository" >&2
+      exit 1
+    fi
+
+    repo_root="$(git rev-parse --show-toplevel)"
+    git_dir="$(git rev-parse --git-dir)"
+    exclude_file="$git_dir/info/exclude"
+
+    cd "$repo_root"
+
+    if [ ! -e AGENTS.md ]; then
+      cat > AGENTS.md <<'EOF'
+    # Project Notes
+
+    (empty - add project-specific conventions here as they're discovered)
+    EOF
+      echo "created AGENTS.md"
+    else
+      echo "AGENTS.md already exists, leaving it alone"
+    fi
+
+    if [ ! -e CLAUDE.md ]; then
+      ln -s AGENTS.md CLAUDE.md
+      echo "created CLAUDE.md -> AGENTS.md (symlink)"
+    elif [ -L CLAUDE.md ] && [ "$(readlink CLAUDE.md)" = "AGENTS.md" ]; then
+      echo "CLAUDE.md already symlinked to AGENTS.md"
+    elif grep -qF '@AGENTS.md' CLAUDE.md 2>/dev/null; then
+      echo "CLAUDE.md already imports AGENTS.md"
+    else
+      tmp="$(mktemp)"
+      { echo "@AGENTS.md"; echo; cat CLAUDE.md; } > "$tmp"
+      mv "$tmp" CLAUDE.md
+      echo "added @AGENTS.md import to top of existing CLAUDE.md"
+    fi
+
+    mkdir -p "$(dirname "$exclude_file")"
+    touch "$exclude_file"
+    for f in AGENTS.md CLAUDE.md; do
+      if ! grep -qxF "$f" "$exclude_file"; then
+        echo "$f" >> "$exclude_file"
+        echo "excluded $f in .git/info/exclude"
+      fi
+    done
   '';
 
   # wezterm needs GPU/EGL access that nix can't see on a non-NixOS Linux
@@ -157,6 +213,7 @@ in
     myshortcuts
     worktrunk
     herdr
+    agentsInit
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
 
