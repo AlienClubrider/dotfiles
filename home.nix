@@ -36,6 +36,23 @@ let
     printf "  %-14s %s\n" "Ctrl-b q" "show pane numbers, then press one to jump"
     printf "  %-14s %s\n" "Ctrl-b \\" "split pane vertically (side by side)"
     printf "  %-14s %s\n" "Ctrl-b -" "split pane horizontally (stacked)"
+    echo ""
+    echo "wt (worktrunk, git worktrees):"
+    printf "  %-24s %s\n" "wt switch --create x" "create worktree + branch \"x\" and switch to it"
+    printf "  %-24s %s\n" "wt switch x" "switch to worktree \"x\""
+    printf "  %-24s %s\n" "wt list" "list worktrees and their status"
+    printf "  %-24s %s\n" "wt remove" "remove worktree; delete branch if merged"
+    echo ""
+    echo "hunk (diff viewer):"
+    printf "  %-24s %s\n" "hunk diff" "review working tree changes"
+    printf "  %-24s %s\n" "hunk diff --staged" "review staged changes"
+    printf "  %-24s %s\n" "hunk diff --watch" "auto-reload as files change"
+    printf "  %-24s %s\n" "hunk show" "review the latest commit"
+    echo ""
+    echo "herdr (agent multiplexer):"
+    printf "  %-24s %s\n" "herdr" "launch or attach to the persistent session"
+    printf "  %-24s %s\n" "Ctrl-b q" "detach (session keeps running)"
+    printf "  %-24s %s\n" "herdr session attach x" "reattach to named session \"x\""
   '';
 
   # wezterm needs GPU/EGL access that nix can't see on a non-NixOS Linux
@@ -71,6 +88,11 @@ in
       email = "brysonbailey94@gmail.com";
     };
   };
+
+  # Review-first terminal diff viewer; invoked explicitly (`hunk diff`,
+  # `hunk show`) rather than replacing git's default pager, so plain
+  # `git diff`/`git show` output stays plain text for scripts and agents.
+  programs.hunk.enable = true;
 
   programs.zsh = {
     enable = true;
@@ -134,6 +156,7 @@ in
     mise
     myshortcuts
     worktrunk
+    herdr
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
 

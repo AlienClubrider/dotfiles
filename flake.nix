@@ -11,9 +11,13 @@
       url = "github:nix-community/nixGL";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hunk = {
+      url = "github:modem-dev/hunk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, home-manager, nixgl, ... }:
+  outputs = { nixpkgs, home-manager, nixgl, hunk, ... }:
     let
       # Picked up from the machine actually running the switch, so the same
       # flake works unmodified on Linux and Apple Silicon. Requires --impure
@@ -29,7 +33,7 @@
     {
       homeConfigurations.bryson = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
-        modules = [ ./home.nix ];
+        modules = [ hunk.homeManagerModules.default ./home.nix ];
         extraSpecialArgs = { inherit isLinux; };
       };
     };
