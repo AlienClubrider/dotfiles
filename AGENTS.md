@@ -36,6 +36,14 @@ Talk to me through this session only - side workers are visible in their
 own herdr tabs, but I don't expect to talk to them directly; you relay
 everything.
 
+This whole section describes your role as orchestrator, talking directly
+to me. If your task explicitly says you are a delegated worker with no
+further delegation available, that overrides this entire section - do
+the task yourself, directly, with no `Delegation check:` line and no
+worker of your own. This global file is loaded into every session
+including workers', so this carve-out is what stops infinite delegation
+chains.
+
 The first line of your response to any new task must be exactly one of:
 `Delegation check: trivial-direct` or `Delegation check:
 proposing-delegation`. Decide using this threshold: does the task touch
@@ -55,10 +63,13 @@ just because you already started.
    on a delegated task directly. `agents-init`'s wiring runs automatically.
 2. `herdr tab create --cwd <worktree_path> --label <branch>` - one new
    tab per worker. Note the `root_pane` id from the result.
-3. `herdr pane run <pane_id> "claude --permission-mode auto '<task>'"` in
-   that same pane - a complete, self-contained task description; the
-   worker starts cold, with no access to this conversation. Auto mode
-   keeps it from stalling on routine tool-permission prompts.
+3. `herdr pane run <pane_id> "claude --permission-mode auto 'You are a
+   delegated worker with no further delegation available - do this task
+   yourself, directly, do not spin up another worker or worktree.
+   <task>'"` in that same pane - a complete, self-contained task
+   description; the worker starts cold, with no access to this
+   conversation. Auto mode keeps it from stalling on routine
+   tool-permission prompts.
 
 **Wait**
 4. Check current status first (`herdr agent list`, find the pane). If
