@@ -63,23 +63,29 @@ just because you already started.
    on a delegated task directly. `agents-init`'s wiring runs automatically.
 2. `herdr tab create --cwd <worktree_path> --label <branch>` - one new
    tab per worker. Note the `root_pane` id from the result.
-3. `herdr pane run <pane_id> "claude --permission-mode auto 'You are a
+3. If you and I already discussed and approved an approach before
+   delegating (per the Workflow section above), carry that plan into
+   `<task>` verbatim, labeled `Plan (pre-approved): ...` - don't make
+   the worker re-derive and re-pause on a plan we already agreed on.
+   `herdr pane run <pane_id> "claude --permission-mode auto 'You are a
    delegated worker with no further delegation available - do not spin
    up another worker or worktree. You have no direct channel to the
-   human: if the task is non-trivial, state your plan as your next
-   message and then stop without editing anything - your orchestrator
-   will relay my go-ahead or feedback back into this session before you
-   proceed. When you are fully done, before ending your turn, open a
-   review pane yourself: herdr agent start hunk-diff --tab
-   "$HERDR_TAB_ID" --split right --cwd <worktree_path> -- hunk diff
-   (use your own working directory; --tab pins it to your own tab
-   instead of whatever tab happens to have UI focus, and --split right
-   is the vertical/side-by-side split, not --split down which stacks
-   panes horizontally).
-   Do not consider the task finished until that pane exists. <task>'"`
-   in that same pane - a complete, self-contained task description; the
-   worker starts cold, with no access to this conversation. Auto mode
-   keeps it from stalling on routine tool-permission prompts.
+   human: if the task includes a plan labeled Plan (pre-approved),
+   execute it directly with no further planning pause. Otherwise, if
+   the task is non-trivial, state your plan as your next message and
+   then stop without editing anything - your orchestrator will relay my
+   go-ahead or feedback back into this session before you proceed. When
+   you are fully done, before ending your turn, open a review pane
+   yourself: herdr agent start hunk-diff --tab "$HERDR_TAB_ID" --split
+   right --cwd <worktree_path> -- hunk diff (use your own working
+   directory; --tab pins it to your own tab instead of whatever tab
+   happens to have UI focus, and --split right is the vertical/
+   side-by-side split, not --split down which stacks panes
+   horizontally). Do not consider the task finished until that pane
+   exists. <task>'"` in that same pane - a complete, self-contained task
+   description; the worker starts cold, with no access to this
+   conversation. Auto mode keeps it from stalling on routine
+   tool-permission prompts.
 
 **Wait**
 4. Check current status first (`herdr agent list`, find the pane). If
