@@ -64,12 +64,18 @@ just because you already started.
 2. `herdr tab create --cwd <worktree_path> --label <branch>` - one new
    tab per worker. Note the `root_pane` id from the result.
 3. `herdr pane run <pane_id> "claude --permission-mode auto 'You are a
-   delegated worker with no further delegation available - do this task
-   yourself, directly, do not spin up another worker or worktree.
-   <task>'"` in that same pane - a complete, self-contained task
-   description; the worker starts cold, with no access to this
-   conversation. Auto mode keeps it from stalling on routine
-   tool-permission prompts.
+   delegated worker with no further delegation available - do not spin
+   up another worker or worktree. You have no direct channel to the
+   human: if the task is non-trivial, state your plan as your next
+   message and then stop without editing anything - your orchestrator
+   will relay my go-ahead or feedback back into this session before you
+   proceed. When you are fully done, before ending your turn, open a
+   review pane yourself: herdr agent start hunk-diff --split down
+   --cwd <worktree_path> -- hunk diff (use your own working directory).
+   Do not consider the task finished until that pane exists. <task>'"`
+   in that same pane - a complete, self-contained task description; the
+   worker starts cold, with no access to this conversation. Auto mode
+   keeps it from stalling on routine tool-permission prompts.
 
 **Wait**
 4. Check current status first (`herdr agent list`, find the pane). If
@@ -85,12 +91,18 @@ just because you already started.
    it's stuck on something it couldn't resolve itself.
 
 **Surface for Review or Relay a Question**
-6. If the worker is actually done: open `hunk diff` in that tab/pane and
-   tell me explicitly which tab has it ready - don't wait to be asked.
-7. If the worker asked a question or is blocked: relay it to me verbatim
-   - don't guess an answer on its behalf, and don't open a diff as if it
-   were done. Once I answer, send it into the worker's pane and return
-   to step 4.
+6. If the worker is actually done: it will have already opened its own
+   `hunk diff` review pane (a sibling split in its tab, per step 3) -
+   don't try to run `hunk diff` yourself into the worker's own pane,
+   that pane is still running its interactive claude session and would
+   just receive it as a chat message, not a shell command. Confirm the
+   diff pane exists (`herdr pane list --workspace <id>` or `herdr tab
+   get <tab_id>`), then tell me explicitly which tab has it ready -
+   don't wait to be asked.
+7. If the worker asked a question, proposed a plan, or is blocked: relay
+   it to me verbatim - don't guess an answer or approve a plan on its
+   behalf, and don't treat it as done just because the pane is idle.
+   Once I answer, send it into the worker's pane and return to step 4.
 
 **Relay Feedback**
 8. Wait for my verdict on the diff.
