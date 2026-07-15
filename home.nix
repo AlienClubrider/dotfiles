@@ -268,6 +268,15 @@ in
     $DRY_RUN_CMD ${pkgs.herdr}/bin/herdr integration install claude
   '';
 
+  # Worktrunk user hook: wires AGENTS.md/CLAUDE.md into every new worktree via
+  # agents-init, ahead of any project-level hooks. Was a hand-edited local file
+  # (it used to also carry unrelated Bosun hooks); safe to manage declaratively
+  # now that it's just this one line.
+  home.file.".config/worktrunk/config.toml".text = ''
+    [pre-start]
+    agents-init = "agents-init"
+  '';
+
   home.file.".config/wezterm".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/wezterm";
 
