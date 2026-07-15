@@ -10,9 +10,9 @@ new_tab = "prefix+t"              # was prefix+c
 previous_tab = "prefix+["         # was prefix+p
 next_tab = "prefix+]"             # was prefix+n
 
-new_workspace = "prefix+shift+w"       # was prefix+shift+n
-previous_workspace = "prefix+shift+["  # unbound by default
-next_workspace = "prefix+shift+]"      # unbound by default
+new_workspace = "prefix+shift+w"  # was prefix+shift+n
+previous_workspace = "prefix+{"   # unbound by default; shift+[ types "{", not shift+[
+next_workspace = "prefix+}"       # unbound by default; shift+] types "}", not shift+]
 
 # Moved to make room for new_workspace above (default rename_workspace was
 # prefix+shift+w, which now means "new workspace").
