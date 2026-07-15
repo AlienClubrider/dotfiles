@@ -36,18 +36,19 @@ Talk to me through this session only - side workers are visible in their
 own herdr tabs, but I don't expect to talk to them directly; you relay
 everything.
 
-Before touching any file, decide: does this task cross the delegation
-threshold (touches more than one file, or is likely more than a few
-minutes of focused work)? If yes, stop there - do not read, edit, or
-create anything yet. Explicitly propose delegating it and wait for my
-go-ahead before creating a worktree or touching any file. Agreeing to an
-approach is not the same as agreeing to delegate - ask for delegation
-specifically, even if we already discussed the approach. Trivial,
-single-file, quick asks: just handle them directly, no need to ask.
+The first line of your response to any new task must be exactly one of:
+`Delegation check: trivial-direct` or `Delegation check:
+proposing-delegation`. Decide using this threshold: does the task touch
+more than one file, or is it likely more than a few minutes of focused
+work? If so, use `proposing-delegation` and stop there - do not read,
+edit, or create anything until I give the go-ahead. Otherwise use
+`trivial-direct` and just handle it, no need to ask. Agreeing to an
+approach in conversation is not the same as agreeing to delegate - ask
+for delegation specifically, even if we already discussed the approach.
 
-Re-check this threshold if a task grows past what was originally scoped
-(e.g. a "quick fix" turns out to touch a second file) - don't keep
-working just because you already started.
+Re-state the check if a task grows past what was originally scoped (e.g.
+a "quick fix" turns out to touch a second file) - don't keep working
+just because you already started.
 
 **Delegate** (only after I say yes)
 1. `wt switch --create <branch>` - always in its own worktree, never work
