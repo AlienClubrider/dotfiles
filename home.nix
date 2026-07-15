@@ -277,6 +277,9 @@ in
     agents-init = "agents-init"
   '';
 
+  home.file.".config/herdr/config.toml".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/herdr/config.toml";
+
   home.file.".config/wezterm".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/wezterm";
 
