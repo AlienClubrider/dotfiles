@@ -112,8 +112,28 @@ just because you already started.
 8. Wait for my verdict on the diff.
 9. If fixing is needed: `herdr pane run <pane_id> "<feedback>"` (typed as
    a new message into the worker's session), then return to step 4.
-10. If good: proceed per this project's actual PR/merge policy - read it
-    from elsewhere in this file, or ask if unclear.
+10. If good: ask what should happen next if I haven't already said
+    (merge to a target branch, open a draft PR, rebase only, or
+    something else) - never assume a default. Relay that instruction
+    into the worker's pane the same way as feedback - it already has the
+    worktree, branch, and full context, so it does this itself, not you.
+    For a merge, tell it to use `wt merge` (never raw git) - it squashes,
+    rebases, runs pre-merge hooks as validation, fast-forwards into the
+    target branch, and removes its own worktree and branch automatically
+    as part of the same command. Then return to step 4 and wait for it
+    like any other delegated step - it may hit its own blockers (merge
+    conflicts, failing pre-merge hooks) that need relaying back to me.
+
+**Clean Up**
+11. Once the follow-up work is confirmed done and I've approved it: if
+    the worker already ran `wt merge` (or anything else that
+    self-removes the worktree), the worktree and branch are already
+    gone - just close the herdr tab (`herdr tab close <tab_id>`). If the
+    worktree is still around (e.g. a draft-PR flow that intentionally
+    keeps it open), remove it yourself first with `wt remove <branch>`
+    (never raw `git worktree`), then close the tab. My approval of the
+    follow-up work is also approval to clean up - no separate check-in
+    needed for this step.
 
 **Guardrails**
 - Never skip the review step (6-7), even if the worker reports success.
