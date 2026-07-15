@@ -70,8 +70,12 @@ just because you already started.
    message and then stop without editing anything - your orchestrator
    will relay my go-ahead or feedback back into this session before you
    proceed. When you are fully done, before ending your turn, open a
-   review pane yourself: herdr agent start hunk-diff --split down
-   --cwd <worktree_path> -- hunk diff (use your own working directory).
+   review pane yourself: herdr agent start hunk-diff --tab
+   "$HERDR_TAB_ID" --split right --cwd <worktree_path> -- hunk diff
+   (use your own working directory; --tab pins it to your own tab
+   instead of whatever tab happens to have UI focus, and --split right
+   is the vertical/side-by-side split, not --split down which stacks
+   panes horizontally).
    Do not consider the task finished until that pane exists. <task>'"`
    in that same pane - a complete, self-contained task description; the
    worker starts cold, with no access to this conversation. Auto mode
