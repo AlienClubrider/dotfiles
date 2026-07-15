@@ -54,29 +54,41 @@ working just because you already started.
    on a delegated task directly. `agents-init`'s wiring runs automatically.
 2. `herdr tab create --cwd <worktree_path> --label <branch>` - one new
    tab per worker. Note the `root_pane` id from the result.
-3. `herdr pane run <pane_id> "claude '<task>'"` in that same pane - a
-   complete, self-contained task description; the worker starts cold,
-   with no access to this conversation.
+3. `herdr pane run <pane_id> "claude --permission-mode auto '<task>'"` in
+   that same pane - a complete, self-contained task description; the
+   worker starts cold, with no access to this conversation. Auto mode
+   keeps it from stalling on routine tool-permission prompts.
 
 **Wait**
-4. Check current status first (`herdr agent list`, find the pane) - if
-   not already `idle`, then `herdr wait agent-status <pane_id> --status
-   idle --timeout <ms>`. Don't block your ability to keep talking to me
-   in the meantime.
+4. Check current status first (`herdr agent list`, find the pane). If
+   not already `idle` or `blocked`, run `herdr wait agent-status
+   <pane_id> --status idle --timeout <ms>` as a background command so I
+   get notified the moment it resolves, instead of polling - don't block
+   your ability to keep talking to me in the meantime.
+5. The moment it resolves (or if it was already idle/blocked): read the
+   worker's actual last message (`herdr agent read <pane_id> --lines
+   40`) before doing anything else. `idle` just means the worker's turn
+   ended - that can mean "task finished" or "it asked a question and is
+   waiting," and those look identical from status alone. `blocked` means
+   it's stuck on something it couldn't resolve itself.
 
-**Surface for Review**
-5. Once idle: in that same tab/pane, run `hunk diff`.
-6. Tell me explicitly which tab has it ready - don't wait to be asked.
+**Surface for Review or Relay a Question**
+6. If the worker is actually done: open `hunk diff` in that tab/pane and
+   tell me explicitly which tab has it ready - don't wait to be asked.
+7. If the worker asked a question or is blocked: relay it to me verbatim
+   - don't guess an answer on its behalf, and don't open a diff as if it
+   were done. Once I answer, send it into the worker's pane and return
+   to step 4.
 
 **Relay Feedback**
-7. Wait for my verdict.
-8. If fixing is needed: `herdr pane run <pane_id> "<feedback>"` (typed as
+8. Wait for my verdict on the diff.
+9. If fixing is needed: `herdr pane run <pane_id> "<feedback>"` (typed as
    a new message into the worker's session), then return to step 4.
-9. If good: proceed per this project's actual PR/merge policy - read it
-   from elsewhere in this file, or ask if unclear.
+10. If good: proceed per this project's actual PR/merge policy - read it
+    from elsewhere in this file, or ask if unclear.
 
 **Guardrails**
-- Never skip the review step (5-6), even if the worker reports success.
+- Never skip the review step (6-7), even if the worker reports success.
 - Never merge, push, or open a PR without my explicit confirmation in
   this session.
 - Only run herdr control commands when `HERDR_ENV=1` is actually set -
