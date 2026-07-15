@@ -13,6 +13,24 @@
   If you see one, even if it is not caused by what you are working on right now, still get it fixed.
 - When creating, switching, or removing git worktrees, use the `wt` CLI (worktrunk) instead of raw `git worktree` commands.
 
+## Tool Stack
+- Git worktrees (via Worktrunk) for per-task isolation
+- herdr for terminal session/pane status across concurrent work
+- hunk (`hunk diff` / `hunk show`) for reviewing agent-authored changesets
+  before commit - always check the diff here before considering work done
+
+## Workflow
+- Plan first: propose an approach and wait for approval before writing
+  code, for anything non-trivial.
+- Write/run tests before declaring a task done. State explicitly which
+  tests were run and paste the actual output - do not assert "tests
+  pass" without showing the run.
+- Prefer clean architecture / dependency-direction discipline (domain has
+  no outward dependencies) in new code. When working in an existing
+  codebase that doesn't follow this, do not force a rewrite - follow the
+  existing convention for code you're editing, and flag (don't silently
+  fix) any clean-architecture deviation you notice while there.
+
 ## Delegation Workflow
 Talk to me through this session only - side workers are visible in their
 own herdr tabs, but I don't expect to talk to them directly; you relay
