@@ -63,18 +63,26 @@ just because you already started.
    on a delegated task directly. `agents-init`'s wiring runs automatically.
 2. `herdr tab create --cwd <worktree_path> --label <branch>` - one new
    tab per worker. Note the `root_pane` id from the result.
-3. If you and I already discussed and approved an approach before
-   delegating (per the Workflow section above), carry that plan into
-   `<task>` verbatim, labeled `Plan (pre-approved): ...` - don't make
-   the worker re-derive and re-pause on a plan we already agreed on.
+3. If you and I already discussed and settled on a concrete approach
+   before delegating, carry that plan into `<task>` verbatim, labeled
+   `Plan: ...`, so the worker does not have to rediscover it. Either
+   way, the worker executes directly, without pausing to propose its
+   own plan and wait - delegation only happens after I have already
+   said yes to the task's scope (per the Workflow section above), so a
+   worker-side re-approval of that same scope is redundant and wastes a
+   round trip. It only pauses if its own investigation shows the task
+   needs to go beyond the scope I approved, or if it hits a genuine
+   blocker it cannot resolve itself.
    `herdr pane run <pane_id> "claude --permission-mode auto 'You are a
    delegated worker with no further delegation available - do not spin
    up another worker or worktree. You have no direct channel to the
-   human: if the task includes a plan labeled Plan (pre-approved),
-   execute it directly with no further planning pause. Otherwise, if
-   the task is non-trivial, state your plan as your next message and
-   then stop without editing anything - your orchestrator will relay my
-   go-ahead or feedback back into this session before you proceed. When
+   human: execute the task directly, investigating as needed - do not
+   pause to propose a plan and wait, the task's scope was already
+   approved before you were delegated. Only stop and wait, instead of
+   proceeding, if your investigation shows the task needs to go beyond
+   that approved scope, or if you hit a genuine blocker you cannot
+   resolve yourself; say what you found, your orchestrator will relay a
+   decision back into this session before you proceed further. When
    you are fully done, before ending your turn, open a review pane
    yourself: herdr agent start hunk-diff --tab "$HERDR_TAB_ID" --split
    right --cwd <worktree_path> -- hunk diff (use your own working
@@ -85,15 +93,23 @@ just because you already started.
    exists. <task>'"` in that same pane - a complete, self-contained task
    description; the worker starts cold, with no access to this
    conversation. Auto mode keeps it from stalling on routine
-   tool-permission prompts.
+   tool-permission prompts. Never fold a commit instruction into
+   `<task>` - the review pane opens with `hunk diff`, which shows only
+   uncommitted working-tree changes, so committing first leaves it
+   empty. Committing (and merging) belongs after my verdict, in steps
+   9-10.
 
 **Wait**
 4. Check current status first (`herdr agent list`, find the pane). If
-   not already `idle` or `blocked`, run `herdr wait agent-status
-   <pane_id> --status idle --timeout <ms>` as a background command so I
-   get notified the moment it resolves, instead of polling - don't block
-   your ability to keep talking to me in the meantime.
-5. The moment it resolves (or if it was already idle/blocked): read the
+   not already `idle`, `blocked`, or `done`, run three background waits
+   - `herdr wait agent-status <pane_id> --status idle --timeout <ms>`,
+   the same with `--status blocked`, and the same with `--status done`
+   (`--status` takes exactly one value per invocation; passing it twice
+   on one call silently keeps only the last one given) - so I get
+   notified the moment any of them resolves, instead of polling. Stop
+   the other two once one fires. Don't block your ability to keep
+   talking to me in the meantime.
+5. The moment one resolves (or if it was already idle/blocked/done): read the
    worker's actual last message (`herdr agent read <pane_id> --lines
    40`) before doing anything else. `idle` just means the worker's turn
    ended - that can mean "task finished" or "it asked a question and is
