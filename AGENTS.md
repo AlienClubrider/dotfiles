@@ -78,31 +78,55 @@ just because you already started.
    round trip. It only pauses if its own investigation shows the task
    needs to go beyond the scope I approved, or if it hits a genuine
    blocker it cannot resolve itself.
-   `herdr pane run <pane_id> "claude --permission-mode auto 'You are a
-   delegated worker with no further delegation available - do not spin
-   up another worker or worktree. You have no direct channel to the
-   human: execute the task directly, investigating as needed - do not
-   pause to propose a plan and wait, the task's scope was already
-   approved before you were delegated. Only stop and wait, instead of
-   proceeding, if your investigation shows the task needs to go beyond
-   that approved scope, or if you hit a genuine blocker you cannot
-   resolve yourself; say what you found, your orchestrator will relay a
-   decision back into this session before you proceed further. When
-   you are fully done, before ending your turn, open a review pane
-   yourself: herdr agent start hunk-diff --tab "$HERDR_TAB_ID" --split
-   right --cwd <worktree_path> -- hunk diff (use your own working
-   directory; --tab pins it to your own tab instead of whatever tab
-   happens to have UI focus, and --split right is the vertical/
-   side-by-side split, not --split down which stacks panes
-   horizontally). Do not consider the task finished until that pane
-   exists. <task>'"` in that same pane - a complete, self-contained task
-   description; the worker starts cold, with no access to this
-   conversation. Auto mode keeps it from stalling on routine
-   tool-permission prompts. Never fold a commit instruction into
-   `<task>` - the review pane opens with `hunk diff`, which shows only
-   uncommitted working-tree changes, so committing first leaves it
-   empty. Committing (and merging) belongs after my verdict, in steps
-   9-10.
+   Send this into that same pane as a self-contained task description -
+   the worker starts cold, with no access to this conversation:
+   `claude --permission-mode auto 'You are a delegated worker with no
+   further delegation available - do not spin up another worker or
+   worktree. You have no direct channel to the human: execute the task
+   directly, investigating as needed - do not pause to propose a plan
+   and wait, the task's scope was already approved before you were
+   delegated. Only stop and wait, instead of proceeding, if your
+   investigation shows the task needs to go beyond that approved scope,
+   or if you hit a genuine blocker you cannot resolve yourself; say
+   what you found, your orchestrator will relay a decision back into
+   this session before you proceed further. When you are fully done,
+   before ending your turn, open a review pane yourself: herdr agent
+   start hunk-diff --tab "$HERDR_TAB_ID" --split right --cwd
+   <worktree_path> -- hunk diff (use your own working directory; --tab
+   pins it to your own tab instead of whatever tab happens to have UI
+   focus, and --split right is the vertical/side-by-side split, not
+   --split down which stacks panes horizontally). Do not consider the
+   task finished until that pane exists. <task>'`. Auto mode keeps it
+   from stalling on routine tool-permission prompts. Never fold a
+   commit instruction into `<task>` - the review pane opens with `hunk
+   diff`, which shows only uncommitted working-tree changes, so
+   committing first leaves it empty. Committing (and merging) belongs
+   after my verdict, in steps 9-10.
+
+   Send it as two explicit steps, never as a single `herdr pane run`
+   call - confirmed by direct reproduction, a prompt this long (the
+   template above plus a real task description routinely runs well
+   over 1000 characters as one quoted argument) reliably races the
+   target shell's own rendering of the pasted text: `pane run`'s
+   type-then-Enter happens with no settle time, the shell is still
+   redrawing the long pasted line when the Enter arrives, and the Enter
+   gets swallowed instead of submitting - the text sits there typed but
+   unsent, and the pane never goes `working`. A single naive follow-up
+   `send-keys Enter` does not reliably fix this either - it's as likely
+   to insert another literal newline into the stuck buffer as it is to
+   submit it. What does work reliably:
+   a. `herdr pane send-text <pane_id> "<the full command above>"` -
+      types/pastes the text only, does not submit it.
+   b. Wait about 2 seconds for the target shell to finish rendering the
+      pasted text before doing anything else.
+   c. `herdr pane send-keys <pane_id> enter` - submits it.
+   d. Verify it actually went through: `herdr pane read <pane_id>
+      --source recent --lines 40`. A fresh shell prompt, claude's
+      startup panel, or a thinking/working indicator means it
+      submitted; the same typed text still sitting at the bottom with
+      no prompt below it means it didn't. If it didn't, send `herdr
+      pane send-keys <pane_id> ctrl+c` to clear the wedged buffer, then
+      repeat from (a).
 
 **Wait**
 4. Check current status first (`herdr agent list`, find the pane). If
@@ -137,8 +161,12 @@ just because you already started.
 
 **Relay Feedback**
 8. Wait for my verdict on the diff.
-9. If fixing is needed: `herdr pane run <pane_id> "<feedback>"` (typed as
-   a new message into the worker's session), then return to step 4.
+9. If fixing is needed: send `<feedback>` into the worker's session the
+   same two-step, settle-then-verify way as step 3's send - short
+   feedback strings are less likely to hit the race than the full
+   worker-launch template, but not immune to it, so use the same
+   reliable path rather than the single-shot `herdr pane run` for
+   consistency. Then return to step 4.
 10. If good: ask what should happen next if I haven't already said
     (merge to a target branch, open a draft PR, rebase only, or
     something else) - never assume a default. Relay that instruction
