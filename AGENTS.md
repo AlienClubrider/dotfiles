@@ -61,8 +61,13 @@ just because you already started.
 **Delegate** (only after I say yes)
 1. `wt switch --create <branch>` - always in its own worktree, never work
    on a delegated task directly. `agents-init`'s wiring runs automatically.
-2. `herdr tab create --cwd <worktree_path> --label <branch>` - one new
-   tab per worker. Note the `root_pane` id from the result.
+2. `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd
+   <worktree_path> --label <branch>` - one new tab per worker, pinned to
+   your own workspace. Omitting `--workspace` falls back to whatever
+   workspace currently has UI focus, which may belong to someone else's
+   orchestrator session - the same failure mode step 3's `--tab
+   "$HERDR_TAB_ID"` already guards against for tab focus. Note the
+   `root_pane` id from the result.
 3. If you and I already discussed and settled on a concrete approach
    before delegating, carry that plan into `<task>` verbatim, labeled
    `Plan: ...`, so the worker does not have to rediscover it. Either
