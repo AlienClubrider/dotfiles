@@ -111,6 +111,147 @@ let
     done
   '';
 
+  # Wraps the three-way `herdr wait agent-status <pane> --status idle/blocked/done`
+  # fan-out from the Delegation Workflow into one command. A worker pane can land
+  # on any of those three terminal states and there's no single herdr status value
+  # covering all of them - manually remembering to launch all three separately has
+  # repeatedly led to one being forgotten (most recently `done`), leaving a stray
+  # background wait running pointlessly. This runs all three, reports whichever
+  # resolves first, and kills the other two - so there's nothing left to forget.
+  herdrWaitAny = pkgs.writeShellScriptBin "herdr-wait-any" ''
+    set -uo pipefail
+
+    usage() {
+      echo "usage: herdr-wait-any <pane_id> --timeout <ms>" >&2
+    }
+
+    pane_id=""
+    timeout_ms=""
+
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --timeout)
+          timeout_ms="''${2:-}"
+          shift 2
+          ;;
+        -h|--help)
+          usage
+          exit 0
+          ;;
+        -*)
+          echo "herdr-wait-any: unknown option: $1" >&2
+          usage
+          exit 2
+          ;;
+        *)
+          if [ -n "$pane_id" ]; then
+            echo "herdr-wait-any: unexpected extra argument: $1" >&2
+            usage
+            exit 2
+          fi
+          pane_id="$1"
+          shift
+          ;;
+      esac
+    done
+
+    if [ -z "$pane_id" ]; then
+      echo "herdr-wait-any: missing required <pane_id>" >&2
+      usage
+      exit 2
+    fi
+
+    if [ -z "$timeout_ms" ]; then
+      echo "herdr-wait-any: missing required --timeout" >&2
+      usage
+      exit 2
+    fi
+
+    statuses=(idle blocked done)
+    work_dir="$(mktemp -d)"
+
+    declare -A pid_for_status
+    pids=()
+
+    for status in "''${statuses[@]}"; do
+      herdr wait agent-status "$pane_id" --status "$status" --timeout "$timeout_ms" \
+        >"$work_dir/$status.out" 2>"$work_dir/$status.err" &
+      pid=$!
+      pid_for_status["$pid"]="$status"
+      pids+=("$pid")
+    done
+
+    # Kills whatever's still running among the three sub-waits. Called both on the
+    # happy path (once a status wins) and on any early exit (trap), so a killed or
+    # interrupted wrapper never leaves a `herdr wait agent-status` process behind.
+    cleanup_remaining() {
+      for pid in "''${pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+          kill "$pid" 2>/dev/null
+        fi
+      done
+      for pid in "''${pids[@]}"; do
+        wait "$pid" 2>/dev/null
+      done
+    }
+    trap 'cleanup_remaining; rm -rf "$work_dir"' EXIT
+
+    # INT/TERM interrupt the `wait -n` below at an arbitrary point; without an
+    # explicit exit here, execution would fall back into the normal loop body and
+    # report a bogus "no status resolved" against a work_dir that's already gone.
+    on_signal() {
+      echo "herdr-wait-any: interrupted" >&2
+      exit 130
+    }
+    trap on_signal INT TERM
+
+    winner_status=""
+    remaining=("''${pids[@]}")
+
+    while [ "''${#remaining[@]}" -gt 0 ]; do
+      wait -n -p finished_pid "''${remaining[@]}" 2>/dev/null
+      exit_code=$?
+
+      # Bash leaves finished_pid unset if wait -n had nothing left to wait on;
+      # guard rather than treat that as a match.
+      if [ -z "''${finished_pid:-}" ]; then
+        break
+      fi
+
+      status="''${pid_for_status[$finished_pid]}"
+
+      new_remaining=()
+      for pid in "''${remaining[@]}"; do
+        if [ "$pid" != "$finished_pid" ]; then
+          new_remaining+=("$pid")
+        fi
+      done
+      remaining=("''${new_remaining[@]}")
+
+      if [ "$exit_code" -eq 0 ]; then
+        winner_status="$status"
+        break
+      fi
+
+      unset finished_pid
+    done
+
+    if [ -n "$winner_status" ]; then
+      echo "$winner_status"
+      exit 0
+    fi
+
+    echo "herdr-wait-any: no status resolved for pane $pane_id within ''${timeout_ms}ms" >&2
+    for status in "''${statuses[@]}"; do
+      msg="$(tr -d '\n' <"$work_dir/$status.err" 2>/dev/null)"
+      if [ -z "$msg" ]; then
+        msg="$(tr -d '\n' <"$work_dir/$status.out" 2>/dev/null)"
+      fi
+      echo "  $status: ''${msg:-(no output)}" >&2
+    done
+    exit 1
+  '';
+
   # wezterm needs GPU/EGL access that nix can't see on a non-NixOS Linux
   # host, so wrap it with nixGL (auto-detects Nvidia vs. Mesa) to pick up
   # the system's real drivers. Not needed on macOS, where wezterm talks to
@@ -214,6 +355,7 @@ in
     worktrunk
     herdr
     agentsInit
+    herdrWaitAny
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
 

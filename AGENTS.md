@@ -175,14 +175,17 @@ worker's pane is actually doing.
 
 **Wait**
 6. Check current status first (`herdr agent list`, find the pane). If
-   not already `idle`, `blocked`, or `done`, run three background waits
-   - `herdr wait agent-status <pane_id> --status idle --timeout <ms>`,
-   the same with `--status blocked`, and the same with `--status done`
-   (`--status` takes exactly one value per invocation; passing it twice
-   on one call silently keeps only the last one given) - so I get
-   notified the moment any of them resolves, instead of polling. Stop
-   the other two once one fires. Don't block your ability to keep
-   talking to me in the meantime.
+   not already `idle`, `blocked`, or `done`, run `herdr-wait-any
+   <pane_id> --timeout <ms>` as a background wait - a worker can land on
+   any of those three terminal states and there's no single herdr status
+   value that covers all of them, so this wrapper starts all three
+   `herdr wait agent-status --status idle/blocked/done` waits internally,
+   prints whichever one resolves first, and kills the other two, instead
+   of you having to remember to launch all three yourself (a step that's
+   been missed before, most recently `done`, leaving a stray wait running
+   pointlessly). Run it in the background so I get notified the moment it
+   resolves, instead of polling, and so it doesn't block your ability to
+   keep talking to me in the meantime.
 7. The moment one resolves (or if it was already idle/blocked/done): read the
    worker's actual last message (`herdr agent read <pane_id> --lines
    40`) before doing anything else. `idle` just means the worker's turn
