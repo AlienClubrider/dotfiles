@@ -100,7 +100,7 @@ worktree, the herdr tab label, and `.claude/delegation/<branch>.md`).
    in the substituted text, THEN wrap the whole thing in single quotes:
    ```bash
    rendered_escaped=$(printf '%s' "$rendered" | sed "s/'/'\\\\''/g")
-   final_command="claude --permission-mode auto '$rendered_escaped'"
+   final_command="claude --permission-mode auto --prompt-suggestions false '$rendered_escaped'"
    ```
 
 8. **Send it, verified, in one call** - `herdr-send-verified` already is the
@@ -113,9 +113,11 @@ worktree, the herdr tab label, and `.claude/delegation/<branch>.md`).
    swallowed Enter, an unreadable pane, or a hard send failure) - stop and
    report this rather than assuming it went through.
 
-9. Auto mode (`--permission-mode auto` in the launch command) keeps the
-   worker from stalling on routine tool-permission prompts - this is already
-   baked into the template, not something to add separately.
+9. Two flags are already baked into the launch template, not something to
+   add separately: auto mode (`--permission-mode auto`) keeps the worker
+   from stalling on routine tool-permission prompts, and
+   `--prompt-suggestions false` keeps the worker's pane from ever showing
+   a predicted-next-prompt that could be mistaken for real typed input.
 
 ## After this skill returns
 

@@ -252,6 +252,93 @@ let
     exit 1
   '';
 
+  # `herdr-wait-any` is level-triggered: if a worker happens to already be
+  # idle/blocked/done at the moment it's called (e.g. right after it
+  # backgrounded a long subprocess and will flip back to working shortly),
+  # it resolves instantly on that stale status instead of catching the
+  # worker actually going back to work. That gives the orchestrator no
+  # signal in exactly the case it needs one - it already knows from the
+  # worker's last message that it isn't really done. This wraps
+  # `herdr-wait-any` with a deterministic pre-check: if the pane is
+  # currently idle/blocked/done, first block until it's observed `working`
+  # (proof it actually left that state) before delegating to
+  # `herdr-wait-any` for the real settle. If the worker never leaves its
+  # starting state within the timeout, that's a distinct "no progress"
+  # outcome (`still-<status>`, exit 3) from a normal settle - the caller
+  # can tell "nothing happened" apart from "it settled".
+  herdrWaitSettle = pkgs.writeShellScriptBin "herdr-wait-settle" ''
+    set -uo pipefail
+
+    usage() {
+      echo "usage: herdr-wait-settle <pane_id> --timeout <ms>" >&2
+    }
+
+    pane_id=""
+    timeout_ms=""
+
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --timeout)
+          timeout_ms="''${2:-}"
+          shift 2
+          ;;
+        -h|--help)
+          usage
+          exit 0
+          ;;
+        -*)
+          echo "herdr-wait-settle: unknown option: $1" >&2
+          usage
+          exit 2
+          ;;
+        *)
+          if [ -n "$pane_id" ]; then
+            echo "herdr-wait-settle: unexpected extra argument: $1" >&2
+            usage
+            exit 2
+          fi
+          pane_id="$1"
+          shift
+          ;;
+      esac
+    done
+
+    if [ -z "$pane_id" ]; then
+      echo "herdr-wait-settle: missing required <pane_id>" >&2
+      usage
+      exit 2
+    fi
+
+    if [ -z "$timeout_ms" ]; then
+      echo "herdr-wait-settle: missing required --timeout" >&2
+      usage
+      exit 2
+    fi
+
+    on_signal() {
+      echo "herdr-wait-settle: interrupted" >&2
+      exit 130
+    }
+    trap on_signal INT TERM
+
+    current_status="$(herdr agent get "$pane_id" 2>/dev/null | ${pkgs.jq}/bin/jq -r '.result.agent.agent_status // empty')"
+    if [ -z "$current_status" ]; then
+      echo "herdr-wait-settle: could not determine current status for pane $pane_id" >&2
+      exit 1
+    fi
+
+    case "$current_status" in
+      idle|blocked|done)
+        if ! herdr wait agent-status "$pane_id" --status working --timeout "$timeout_ms" >/dev/null 2>&1; then
+          echo "herdr-wait-settle: still-$current_status (pane $pane_id never left $current_status to start working within ''${timeout_ms}ms)" >&2
+          exit 3
+        fi
+        ;;
+    esac
+
+    exec ${herdrWaitAny}/bin/herdr-wait-any "$pane_id" --timeout "$timeout_ms"
+  '';
+
   # Replaces the Delegation Workflow's manual send-text/sleep/send-keys/verify
   # dance (the paste-race workaround for long task text swallowing Enter) with
   # a single verified call. Ported from firstmate's proven herdr adapter
@@ -717,6 +804,7 @@ in
     herdr
     agentsInit
     herdrWaitAny
+    herdrWaitSettle
     herdrSendVerified
     herdrSpawnTab
     delegationIndexTrim

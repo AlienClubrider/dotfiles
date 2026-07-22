@@ -117,10 +117,22 @@ worker's pane is actually doing.
    pointlessly). Run it in the background so I get notified the moment it
    resolves, instead of polling, and so it doesn't block your ability to
    keep talking to me in the meantime.
+
+   If the worker's last message already shows it mid-flight (e.g. it just
+   backgrounded a long subprocess and said it'll check back) despite the
+   pane currently reporting idle/blocked/done, use `herdr-wait-settle
+   <pane_id> --timeout <ms>` instead. `herdr-wait-any` is level-triggered:
+   called against a pane that's already idle/blocked/done, it resolves
+   instantly on that stale status instead of catching the worker actually
+   going back to work, which gives no signal in exactly the case you
+   already know isn't really done. `herdr-wait-settle` first blocks until
+   the pane is observed leaving that state to `working`, then delegates to
+   `herdr-wait-any` for the real settle - so it can't resolve on a status
+   that was already stale when you called it.
    **With more than one worker in flight:** launch one `herdr-wait-any`
-   background wait per pane, for every worker not already
-   idle/blocked/done, in the same turn - independent background Bash
-   calls, not one after another. Starting worker B's wait only after
+   (or `herdr-wait-settle`) background wait per pane, for every worker not
+   already idle/blocked/done, in the same turn - independent background
+   Bash calls, not one after another. Starting worker B's wait only after
    worker A's resolves serializes your attention onto whichever worker
    happened to go first and can delay or miss the other one's
    completion entirely, which is exactly the "only hear from one worker
