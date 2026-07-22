@@ -186,12 +186,25 @@ worker's pane is actually doing.
    pointlessly). Run it in the background so I get notified the moment it
    resolves, instead of polling, and so it doesn't block your ability to
    keep talking to me in the meantime.
-7. The moment one resolves (or if it was already idle/blocked/done): read the
-   worker's actual last message (`herdr agent read <pane_id> --lines
-   40`) before doing anything else. `idle` just means the worker's turn
-   ended - that can mean "task finished" or "it asked a question and is
-   waiting," and those look identical from status alone. `blocked` means
-   it's stuck on something it couldn't resolve itself.
+   **With more than one worker in flight:** launch one `herdr-wait-any`
+   background wait per pane, for every worker not already
+   idle/blocked/done, in the same turn - independent background Bash
+   calls, not one after another. Starting worker B's wait only after
+   worker A's resolves serializes your attention onto whichever worker
+   happened to go first and can delay or miss the other one's
+   completion entirely, which is exactly the "only hear from one worker
+   at a time" failure this step exists to prevent.
+7. Each background wait resolves independently and is reported back to
+   you as its own notification - handle each one as it arrives on its
+   own terms, don't wait for a second in-flight worker to also resolve
+   before acting on the first. The moment one resolves (or if it was
+   already idle/blocked/done): read that worker's actual last message
+   (`herdr agent read <pane_id> --lines 40`) before doing anything else.
+   `idle` just means the worker's turn ended - that can mean "task
+   finished" or "it asked a question and is waiting," and those look
+   identical from status alone. `blocked` means it's stuck on something
+   it couldn't resolve itself. After handling it, resume waiting on
+   whichever other workers are still in flight.
 
 **If my own context gets cleared while workers are in flight**
 8. Read `.claude/delegation/index.md` first to rebuild the roster, then
