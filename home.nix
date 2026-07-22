@@ -252,6 +252,367 @@ let
     exit 1
   '';
 
+  # Replaces the Delegation Workflow's manual send-text/sleep/send-keys/verify
+  # dance (the paste-race workaround for long task text swallowing Enter) with
+  # a single verified call. Ported from firstmate's proven herdr adapter
+  # (~/.bosun/firstmate-home/bin/backends/herdr.sh, fm_backend_herdr_send_text_submit):
+  # type the text once (unsubmitted), capture the pane as a baseline, then
+  # retry Enter-only (never retype) until the capture visibly changes from
+  # that baseline. Only a capture that never changes after all retries is a
+  # confirmed swallow (exit 1); this is strictly better than a fixed sleep
+  # guess, since it retries automatically and reports a real error instead of
+  # silently leaving unsent text sitting in the composer.
+  herdrSendVerified = pkgs.writeShellScriptBin "herdr-send-verified" ''
+    set -uo pipefail
+
+    usage() {
+      echo "usage: herdr-send-verified <pane_id> <text...>" >&2
+      echo "       herdr-send-verified <pane_id> --key <Enter|Escape|ctrl+c>" >&2
+    }
+
+    PANE_ID="''${1:-}"
+    if [ -z "$PANE_ID" ]; then
+      usage
+      exit 2
+    fi
+    shift
+
+    normalize_key() {
+      case "$1" in
+        Enter|enter) echo enter ;;
+        Escape|escape|Esc|esc) echo escape ;;
+        C-c|c-c|ctrl+c|Ctrl+C) echo "ctrl+c" ;;
+        *) echo "$1" ;;
+      esac
+    }
+
+    # Bounded pane capture. herdr's own `pane read --lines N` returns COMPLETELY
+    # EMPTY output (not a clamped result) when N is smaller than the pane's
+    # current viewport height (~23 rows for a default pane) - verified upstream
+    # in firstmate's docs/herdr-backend.md. Always request a generous floor and
+    # trim locally with `tail` instead of trusting a small --lines straight through.
+    capture() {
+      local lines="''${1:-6}" out
+      out=$(herdr pane read "$PANE_ID" --source recent --lines 200 2>/dev/null) || return 1
+      printf '%s' "$out" | tail -n "$lines"
+    }
+
+    if [ "''${1:-}" = "--key" ]; then
+      key=$(normalize_key "''${2:-Enter}")
+      if ! herdr pane send-keys "$PANE_ID" "$key" >/dev/null 2>&1; then
+        echo "error: failed to send key '$key' to pane $PANE_ID" >&2
+        exit 1
+      fi
+      exit 0
+    fi
+
+    TEXT="$*"
+    if [ -z "$TEXT" ]; then
+      usage
+      exit 2
+    fi
+
+    # Slash commands (and codex `$<skill>` invocations) open a completion popup in
+    # some TUIs; submitting too fast selects nothing. Give popups time to settle
+    # before the (retried) Enter below.
+    case "$TEXT" in
+      /*|\$*) SETTLE="''${HERDR_SEND_SETTLE:-1.2}" ;;
+      *) SETTLE="''${HERDR_SEND_SETTLE:-0.3}" ;;
+    esac
+    RETRIES="''${HERDR_SEND_RETRIES:-5}"
+    SLEEP_S="''${HERDR_SEND_SLEEP:-0.4}"
+
+    if ! herdr pane send-text "$PANE_ID" "$TEXT" >/dev/null 2>&1; then
+      echo "error: text not sent to pane $PANE_ID (herdr pane send-text failed)" >&2
+      exit 1
+    fi
+
+    sleep "$SETTLE"
+    if ! typed=$(capture 6); then
+      echo "error: pane $PANE_ID unreadable after send; cannot verify submit" >&2
+      exit 1
+    fi
+
+    i=0
+    while :; do
+      herdr pane send-keys "$PANE_ID" enter >/dev/null 2>&1 || true
+      sleep "$SLEEP_S"
+      if ! after=$(capture 6); then
+        echo "error: pane $PANE_ID became unreadable mid-retry; cannot verify submit" >&2
+        exit 1
+      fi
+      if [ "$after" != "$typed" ]; then
+        exit 0
+      fi
+      i=$((i + 1))
+      if [ "$i" -ge "$RETRIES" ]; then
+        echo "error: text not submitted to pane $PANE_ID (Enter swallowed; text left in composer after $RETRIES retries)" >&2
+        exit 1
+      fi
+    done
+  '';
+
+  # Replaces the Delegation Workflow's manual `herdr tab create --workspace
+  # ... --cwd ... --label ...` step, whose known failure mode is a caller
+  # omitting --workspace and landing the tab in whatever workspace currently
+  # has UI focus (possibly someone else's session). Ported from firstmate's
+  # fm_backend_herdr_workspace_ensure + fm_backend_herdr_create_task
+  # (~/.bosun/firstmate-home/bin/backends/herdr.sh): find-or-create the
+  # workspace by a stable label instead of assuming it already exists, and
+  # refuse a duplicate tab label instead of silently creating a second one
+  # (herdr enforces no label uniqueness itself for either workspaces or tabs).
+  # One workspace per PROJECT (not per worktree, since worktrees are
+  # transient per delegated branch): the label is derived from the project's
+  # own primary checkout via `git rev-parse --git-common-dir`, which always
+  # resolves to the primary .git even when called from inside a worktree, so
+  # every worker for a project lands as a tab in that same one workspace.
+  herdrSpawnTab = pkgs.writeShellScriptBin "herdr-spawn-tab" ''
+    set -uo pipefail
+
+    usage() {
+      echo "usage: herdr-spawn-tab <label> <cwd>" >&2
+    }
+
+    LABEL="''${1:-}"
+    CWD="''${2:-}"
+    if [ -z "$LABEL" ] || [ -z "$CWD" ]; then
+      usage
+      exit 2
+    fi
+
+    if [ ! -d "$CWD" ]; then
+      echo "error: cwd $CWD does not exist" >&2
+      exit 1
+    fi
+
+    command -v jq >/dev/null 2>&1 || { echo "error: jq is required to parse herdr's JSON output" >&2; exit 1; }
+
+    GIT_COMMON_DIR=$(git -C "$CWD" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    if [ -z "$GIT_COMMON_DIR" ]; then
+      echo "error: $CWD is not inside a git repository (cannot derive a workspace label)" >&2
+      exit 1
+    fi
+    PROJ_LABEL=$(basename "$(dirname "$GIT_COMMON_DIR")")
+    if [ -z "$PROJ_LABEL" ]; then
+      echo "error: could not derive a project label from $CWD" >&2
+      exit 1
+    fi
+
+    # Find-before-create: never assume the workspace already exists (the known
+    # failure mode this replaces - a caller omitting --workspace and landing the
+    # tab in whatever workspace currently has UI focus).
+    WORKSPACE_ID=$(herdr workspace list 2>/dev/null | jq -r --arg label "$PROJ_LABEL" \
+      '.result.workspaces[]? | select(.label == $label) | .workspace_id' | head -1)
+
+    if [ -z "$WORKSPACE_ID" ]; then
+      CREATE_OUT=$(herdr workspace create --cwd "$CWD" --label "$PROJ_LABEL" --no-focus 2>/dev/null)
+      if [ -z "$CREATE_OUT" ]; then
+        echo "error: failed to create herdr workspace '$PROJ_LABEL'" >&2
+        exit 1
+      fi
+      WORKSPACE_ID=$(printf '%s' "$CREATE_OUT" | jq -r '.result.workspace.workspace_id // empty')
+      if [ -z "$WORKSPACE_ID" ]; then
+        echo "error: could not parse workspace_id from herdr workspace create output" >&2
+        exit 1
+      fi
+    fi
+
+    # herdr enforces no label uniqueness itself - two tabs (or two workspaces)
+    # can share a label - so the duplicate check is ours, matching the
+    # find-before-create workspace lookup above.
+    DUP=$(herdr tab list --workspace "$WORKSPACE_ID" 2>/dev/null | jq -r --arg label "$LABEL" \
+      '.result.tabs[]? | select(.label == $label) | .tab_id' | head -1)
+    if [ -n "$DUP" ]; then
+      echo "error: herdr tab '$LABEL' already exists in workspace $WORKSPACE_ID ($PROJ_LABEL) - refusing to create a duplicate" >&2
+      exit 1
+    fi
+
+    TAB_OUT=$(herdr tab create --workspace "$WORKSPACE_ID" --cwd "$CWD" --label "$LABEL" --no-focus 2>/dev/null)
+    if [ -z "$TAB_OUT" ]; then
+      echo "error: herdr tab create failed for label $LABEL in workspace $WORKSPACE_ID" >&2
+      exit 1
+    fi
+
+    TAB_ID=$(printf '%s' "$TAB_OUT" | jq -r '.result.tab.tab_id // empty')
+    PANE_ID=$(printf '%s' "$TAB_OUT" | jq -r '.result.root_pane.pane_id // empty')
+
+    if [ -z "$TAB_ID" ] || [ -z "$PANE_ID" ]; then
+      echo "error: could not parse tab/pane id from herdr tab create output" >&2
+      exit 1
+    fi
+
+    echo "$TAB_ID $PANE_ID"
+  '';
+
+  # Mechanizes the Delegation Workflow's index.md trim step: once
+  # .claude/delegation/index.md grows past --keep (default 20) entries, drop
+  # the oldest down to that count, deleting each dropped entry's <branch>.md
+  # in the same step (a matched deletion, not an archive - index.md should
+  # never point at a plan file that no longer exists, and no plan file should
+  # outlive its roster line). Doing this by hand via ad hoc file edits is
+  # exactly the kind of bookkeeping that hides a dangling-reference bug; this
+  # is a no-op below the threshold, so it is safe to run unconditionally.
+  # No brigade/firstmate equivalent - their tracker is tickets.toml/
+  # no-mistakes-backed, not the markdown table this repo's own delegation
+  # workflow uses, so this one is novel rather than ported.
+  delegationIndexTrim = pkgs.writeShellScriptBin "delegation-index-trim" ''
+    set -uo pipefail
+
+    usage() {
+      echo "usage: delegation-index-trim [--keep N]  (default N=20)" >&2
+    }
+
+    KEEP=20
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --keep)
+          KEEP="''${2:-}"
+          shift 2
+          ;;
+        -h|--help)
+          usage
+          exit 0
+          ;;
+        *)
+          echo "delegation-index-trim: unknown argument: $1" >&2
+          usage
+          exit 2
+          ;;
+      esac
+    done
+
+    if ! [[ "$KEEP" =~ ^[0-9]+$ ]]; then
+      echo "delegation-index-trim: --keep requires a positive integer, got: '$KEEP'" >&2
+      exit 2
+    fi
+
+    INDEX=".claude/delegation/index.md"
+    if [ ! -f "$INDEX" ]; then
+      echo "delegation-index-trim: no $INDEX in $(pwd) - nothing to trim"
+      exit 0
+    fi
+
+    mapfile -t LINES < <(grep -v '^[[:space:]]*$' "$INDEX")
+    TOTAL="''${#LINES[@]}"
+
+    if [ "$TOTAL" -le "$KEEP" ]; then
+      echo "delegation-index-trim: $TOTAL entries, within --keep $KEEP - no trim needed"
+      exit 0
+    fi
+
+    DROP_COUNT=$((TOTAL - KEEP))
+    DROPPED=("''${LINES[@]:0:$DROP_COUNT}")
+    KEPT=("''${LINES[@]:$DROP_COUNT}")
+
+    for line in "''${DROPPED[@]}"; do
+      # Plan paths always live under .claude/delegation/ - anchor on that rather
+      # than assuming a fixed pipe-field position, since goal/status text is
+      # free-form and could itself contain a literal "|".
+      plan_path=$(printf '%s\n' "$line" | grep -oE '\.claude/delegation/[^ |]+\.md' | head -1)
+      if [ -n "$plan_path" ] && [ -f "$plan_path" ]; then
+        rm -f -- "$plan_path"
+        echo "delegation-index-trim: dropped $plan_path"
+      fi
+    done
+
+    printf '%s\n' "''${KEPT[@]}" > "$INDEX"
+    echo "delegation-index-trim: trimmed $DROP_COUNT entries, kept $KEEP"
+  '';
+
+  # Mechanizes the Delegation Workflow's teardown step: close the worker's
+  # herdr tab, and remove its worktree unless it was already self-removed
+  # (e.g. the worker already ran `wt merge`, which removes its own worktree
+  # and branch as part of the same command). --tab and the worktree-gone
+  # check both auto-fall-back to the worker's own
+  # .claude/delegation/<branch>.md header (its recorded tab:/worktree:
+  # fields) when not given explicitly, so the common case needs only the
+  # branch name; --tab and --worktree-gone remain available to override or
+  # to cover a missing/stale plan file.
+  delegationCleanup = pkgs.writeShellScriptBin "delegation-cleanup" ''
+    set -uo pipefail
+
+    usage() {
+      echo "usage: delegation-cleanup <branch> [--tab <tab_id>] [--worktree-gone]" >&2
+    }
+
+    BRANCH=""
+    TAB_ID=""
+    WORKTREE_GONE=0
+
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --tab)
+          TAB_ID="''${2:-}"
+          shift 2
+          ;;
+        --worktree-gone)
+          WORKTREE_GONE=1
+          shift
+          ;;
+        -h|--help)
+          usage
+          exit 0
+          ;;
+        -*)
+          echo "delegation-cleanup: unknown option: $1" >&2
+          usage
+          exit 2
+          ;;
+        *)
+          if [ -n "$BRANCH" ]; then
+            echo "delegation-cleanup: unexpected extra argument: $1" >&2
+            usage
+            exit 2
+          fi
+          BRANCH="$1"
+          shift
+          ;;
+      esac
+    done
+
+    if [ -z "$BRANCH" ]; then
+      usage
+      exit 2
+    fi
+
+    PLAN_FILE=".claude/delegation/$BRANCH.md"
+
+    # --tab is optional: fall back to the tab id recorded in the worker's own
+    # plan file header, so a caller doesn't have to keep it around separately.
+    if [ -z "$TAB_ID" ] && [ -f "$PLAN_FILE" ]; then
+      TAB_ID=$(grep -m1 '^tab:' "$PLAN_FILE" | sed 's/^tab:[[:space:]]*//')
+    fi
+
+    # Auto-detect an already-self-removed worktree (e.g. the worker already ran
+    # `wt merge`, which removes its own worktree and branch) from the plan
+    # file's recorded worktree path, unless --worktree-gone already said so.
+    if [ "$WORKTREE_GONE" -eq 0 ] && [ -f "$PLAN_FILE" ]; then
+      WT_PATH=$(grep -m1 '^worktree:' "$PLAN_FILE" | sed 's/^worktree:[[:space:]]*//')
+      if [ -n "$WT_PATH" ] && [ ! -d "$WT_PATH" ]; then
+        echo "delegation-cleanup: worktree $WT_PATH already gone (self-removed, e.g. by wt merge) - skipping wt remove"
+        WORKTREE_GONE=1
+      fi
+    fi
+
+    if [ "$WORKTREE_GONE" -eq 0 ]; then
+      echo "delegation-cleanup: removing worktree for branch $BRANCH"
+      wt remove "$BRANCH"
+    else
+      echo "delegation-cleanup: worktree already gone, not calling wt remove"
+    fi
+
+    if [ -n "$TAB_ID" ]; then
+      echo "delegation-cleanup: closing herdr tab $TAB_ID"
+      if ! herdr tab close "$TAB_ID" >/dev/null 2>&1; then
+        echo "delegation-cleanup: warning: herdr tab close $TAB_ID failed (already closed?)" >&2
+      fi
+    else
+      echo "delegation-cleanup: warning: no tab id given or recorded in $PLAN_FILE - not closing any herdr tab" >&2
+    fi
+
+    echo "delegation-cleanup: done for branch $BRANCH"
+  '';
+
   # wezterm needs GPU/EGL access that nix can't see on a non-NixOS Linux
   # host, so wrap it with nixGL (auto-detects Nvidia vs. Mesa) to pick up
   # the system's real drivers. Not needed on macOS, where wezterm talks to
@@ -356,6 +717,10 @@ in
     herdr
     agentsInit
     herdrWaitAny
+    herdrSendVerified
+    herdrSpawnTab
+    delegationIndexTrim
+    delegationCleanup
   ] ++ weztermPackages;
   fonts.fontconfig.enable = true;
 
@@ -433,6 +798,15 @@ in
 
   home.file.".claude/CLAUDE.md".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/AGENTS.md";
+
+  # The `delegate` skill (mechanizes the Delegation Workflow's worker-spawn
+  # mechanics) and its worker-launch template - global, like the Delegation
+  # Workflow prose in AGENTS.md it replaces, not project-scoped.
+  home.file.".claude/skills/delegate/SKILL.md".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/claude/skills/delegate/SKILL.md";
+
+  home.file.".claude/skills/delegate/worker-launch-template.txt".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/claude/skills/delegate/worker-launch-template.txt";
 
   home.file.".codex/AGENTS.md".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.dotfiles/AGENTS.md";
