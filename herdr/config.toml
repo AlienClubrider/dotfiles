@@ -1,3 +1,4 @@
+onboarding = false
 # herdr configuration
 # Symlinked to ~/.config/herdr/config.toml by home.nix.
 # Full default reference: `herdr --default-config`
