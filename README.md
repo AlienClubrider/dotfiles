@@ -1,107 +1,42 @@
 # dotfiles
 
-Reproducible dev environment managed with [Nix](https://nixos.org) +
-[home-manager](https://nix-community.github.io/home-manager/): shell (zsh +
-starship), git/gh, fzf, and config for WezTerm and Neovim (lazy.nvim,
-snacks.nvim, oil.nvim, neogit, gitsigns, which-key).
+My terminal setup for macOS: WezTerm, Neovim, zsh (with Starship, autosuggestions,
+syntax highlighting and fzf) and a handful of command-line tools. Tools come from
+Homebrew; configs are plain files that get **copied** into place (no symlinks, no Nix).
 
-No system-level manager (nix-darwin/NixOS) is used here — everything lives
-in the user's home directory, so this works the same way on a fresh macOS
-or Linux machine.
+## What's here
 
-## Structure
+| Path | Goes to | What it is |
+| --- | --- | --- |
+| `wezterm/` | `~/.config/wezterm/` | WezTerm: rose-pine-moon, Hack Nerd Font, 80% opacity, starts maximized |
+| `nvim/` | `~/.config/nvim/` | Neovim (lazy.nvim, snacks, oil, which-key, neogit, gitsigns, diffview) |
+| `zsh/zshrc` | `~/.zshrc` | Shell setup, `myshortcuts` command, Ctrl-F to accept suggestions |
+| `zsh/aliases.zsh` | `~/.config/zsh/aliases.zsh` | Shell aliases (`ll`, `gs`, `vim`, ...) |
+| `starship/starship.toml` | `~/.config/starship.toml` | Prompt |
+| `Brewfile` | — | Every tool and font to install |
+| `install.sh` | — | Installs the Brewfile and copies the configs |
 
-- `flake.nix` / `flake.lock` — pins the exact package versions (nixpkgs +
-  home-manager) so a rebuild years from now installs the same thing it did
-  today.
-- `home.nix` — the actual config: packages, zsh, starship, git, gh, fzf,
-  and the symlinks that wire `wezterm/` and `nvim/` into `~/.config`.
-- `wezterm/`, `nvim/` — plain config files for those two apps, edited
-  in place (see below).
-- `bootstrap.sh` — one-time setup on a new machine.
-- `rebuild.sh` — re-run any time `home.nix` changes.
+## Set up a new Mac
 
-## Using this on a brand new machine
+1. Install [Homebrew](https://brew.sh).
+2. Clone and install:
 
-Works unmodified on both macOS (Apple Silicon or Intel) and Linux — the
-flake detects the current system and username at switch time (via
-`--impure`, see below), so there's nothing to edit first. Clone the repo
-anywhere you like and run the bootstrap script:
+   ```sh
+   git clone https://github.com/AlienClubrider/dotfiles.git ~/dev/dotfiles
+   cd ~/dev/dotfiles
+   ./install.sh
+   ```
 
-```sh
-git clone git@github.com:AlienClubrider/dotfiles.git
-cd dotfiles
-./bootstrap.sh
-```
+3. Set Caps Lock to Escape (macOS doesn't let a script do this cleanly):
+   **System Settings → Keyboard → Keyboard Shortcuts → Modifier Keys → Caps Lock → Escape**.
 
-`bootstrap.sh` will:
+`install.sh` backs up any existing file it would replace as `<name>.bak-<timestamp>`.
 
-1. Install Nix (via the [Determinate Systems installer](https://determinate.systems/nix-installer/)) if it isn't already present.
-2. Symlink the repo to `~/.dotfiles` — a stable path that `home.nix` uses
-   to find `wezterm/` and `nvim/`, regardless of where you actually cloned
-   the repo.
-3. Run the first `home-manager switch`, which installs every package and
-   config declared in `home.nix`.
-4. Make zsh your login shell (this needs your password, since only root
-   can change `/etc/shells` — everything else runs unprivileged).
+## Making changes
 
-Log out and back in (or reboot) afterward so the new login shell takes
-effect.
-
-If you already have a `~/.zshrc` (or other files home-manager wants to
-manage), move it aside first — e.g. `mv ~/.zshrc ~/.zshrc.bak` — since
-home-manager refuses to overwrite files it doesn't already own.
-
-### Why `--impure`
-
-`flake.nix` reads the current system (`builtins.currentSystem`) and user
-(`$USER`) at evaluation time instead of hardcoding them, which is what
-lets the same flake work on any machine unedited. Both are impure by Nix's
-definition (their value depends on where you run it), so `bootstrap.sh`
-and `rebuild.sh` both pass `--impure`. Everything else about the config is
-still fully pinned by `flake.lock`.
-
-### macOS notes
-
-- `wezterm` runs straight from nixpkgs — no wrapper needed, since it talks
-  to Metal directly instead of needing Linux's EGL/GL stack.
-- The nerd font gets symlinked into `~/Library/Fonts` automatically on
-  activation, since macOS apps read fonts via CoreText rather than
-  fontconfig.
-- Caps Lock -> Escape isn't scripted here (no nix-darwin means home-manager
-  can't touch system keyboard settings). Set it manually once: System
-  Settings > Keyboard > Keyboard Shortcuts > Modifier Keys > set the Caps
-  Lock key to Escape.
-
-### Linux notes
-
-- `wezterm` is wrapped with [nixGL](https://github.com/nix-community/nixGL)
-  (`nixGLDefault`, which auto-detects Nvidia vs. Mesa at switch time).
-  Nix-built GUI apps can't see a non-NixOS host's GPU drivers on their
-  own, so without this wrapper wezterm fails to open a window with an EGL
-  error.
-- Caps Lock is remapped to Escape via an XDG autostart entry that runs
-  `setxkbmap -option caps:escape` at login. Went with this over the
-  desktop's own keyboard-settings (gsettings/dconf) because Cinnamon's
-  settings daemon didn't actually apply that key to the live X session when
-  tested — `setxkbmap` in autostart works regardless of which X11 desktop
-  is running. It's additive (`-option`, not `-options`), so it layers onto
-  whatever XKB options the system already sets rather than replacing them.
+Edit files in this repo, then run `./install.sh --no-brew` to copy them over
+(drop `--no-brew` if you changed the `Brewfile`). Then commit and push as usual.
 
 ## Everyday use
 
-Run `myshortcuts` any time to print the full list of shell aliases this
-config sets up (`ll`, `gs`, `ta`, etc.) — it's generated straight from
-`home.nix`, so it never drifts out of date.
-
-## Making changes later
-
-- **Editing `home.nix`** (packages, zsh, starship, git/gh config): after
-  editing, run `./rebuild.sh` to apply it.
-- **Editing `wezterm/wezterm.lua` or anything under `nvim/`**: these are
-  live-symlinked into `~/.config`, so changes take effect immediately —
-  WezTerm hot-reloads its config, and Neovim picks up changes the next
-  time it starts. No rebuild needed.
-
-Commit and push changes the normal way (`git add`, `git commit`,
-`git push`) to keep GitHub in sync.
+Run `myshortcuts` to list your aliases and key bindings.

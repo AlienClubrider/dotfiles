@@ -1,0 +1,34 @@
+# Installed to ~/.zshrc by install.sh. Edit it in the dotfiles repo, then re-run install.sh.
+
+export EDITOR=nvim
+BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+
+# Aliases + the `myshortcuts` command
+source "$HOME/.config/zsh/aliases.zsh"
+myshortcuts() {
+  echo "Shell aliases:"
+  sed -nE "s/^alias ([^=]+)='(.*)'$/\1\t\2/p" "$HOME/.config/zsh/aliases.zsh" |
+    while IFS=$'\t' read -r name cmd; do printf "  %-6s %s\n" "$name" "$cmd"; done
+  echo ""
+  echo "Keys:"
+  printf "  %-8s %s\n" "Ctrl-F" "accept the grey autosuggestion"
+  printf "  %-8s %s\n" "Ctrl-R" "fuzzy-search command history (fzf)"
+  printf "  %-8s %s\n" "Ctrl-T" "fuzzy-pick a file into the command line (fzf)"
+  printf "  %-8s %s\n" "Alt-C" "fuzzy-cd into a subdirectory (fzf)"
+  printf "  %-8s %s\n" "Caps" "Escape (set once in System Settings, see README)"
+}
+
+# Suggestions as you type; Ctrl-F accepts them
+[ -f "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] &&
+  source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+bindkey '^f' autosuggest-accept
+
+# fzf keys (Ctrl-R / Ctrl-T / Alt-C)
+command -v fzf >/dev/null && source <(fzf --zsh)
+
+command -v mise >/dev/null && eval "$(mise activate zsh)"
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# Syntax highlighting must be sourced last
+[ -f "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] &&
+  source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

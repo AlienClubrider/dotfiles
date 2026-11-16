@@ -1,0 +1,11 @@
+# Shell aliases. `myshortcuts` reads this file, so keep one alias per line.
+alias ll='eza -la'
+alias ls='eza'
+alias cat='bat'
+alias gs='git status'
+alias ga='git add'
+alias gc='git commit'
+alias gp='git push'
+alias gl='git log --oneline --graph --decorate'
+alias vim='nvim'
+alias vi='nvim'
